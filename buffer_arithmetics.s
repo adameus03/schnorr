@@ -173,18 +173,18 @@ mul_buffers:
 
 smod_buffer:
 # rcx - addr of first input buffer = output buffer
-# rdx - addr of buffer to divide by (second buffer) - non zero!
+# rdx - addr of buffer to divide by (second buffer) - non zero! a.k.a. modbuf
 #       //OBSOLETE: 64bit 0x0 additional suffix mandatory
 # OBSOLETE: r8 - addr of output buffer
-# r9 - len of each buffer(B) //OBSOLETE: (w/0 suffix)
+# r8 - len of each buffer(B) //OBSOLETE: (w/0 suffix)
 
-	movq %rdx, %rsi   #####################################
-	addq %r9, %rsi    # Load tail of second buffer to rsi #
-	# addq $0x8, %rsi #####################################
+	movq %rdx, %rsi   ##############################################
+	addq %r8, %rsi    # Load tail of second buffer (modbuf) to rsi #
+	# addq $0x8, %rsi ##############################################
 
-	movq %rcx, %rdi  ######################################
-	addq %r9, %rdi   # Load tail of io buffer to rdi      #
-	# addq $0x8, %rdi######################################
+	movq %rcx, %rdi   ######################################
+	addq %r8, %rdi    # Load tail of io buffer to rdi      #
+	# addq $0x8, %rdi ######################################
 
 	movq %rdi, %r12  # Copy rdi to r12, to access output tail later
 	subq $0x8, %r12  # Make it the tail-1 of output
