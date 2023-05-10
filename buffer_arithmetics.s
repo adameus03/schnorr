@@ -93,4 +93,55 @@ sub_buffers:
 	fin_sub: ret
 
 
+mul_buffers:
+# rcx - addr of first input buffer
+# rdx - addr of second input buffer
+# r8 - addr of output buffer
+# r9 - len of input buffers(B) = half length of output buffer
 
+	movq %rdx, %r12 # saving rdx to r12, because rdx will be used by mulq
+	movq %r9, %r10
+	iter_mul_1: andq %r10, %r10
+	jz end_iter_mul_1
+	subq $0x8, %r10
+		movq %r9, %r11
+		iter_mul_2: andq %r11, %r11
+		# jz ??? !!!!!!!!!!!!!!!!!!!!!!!!!
+		subq $0x8, %r11
+			#begin loop content
+			movq %r8, %rdi    ######################################
+			addq %r10, %rdi   # Making rdi hold address of c[l+k]  #
+			addq %r11, %rdi   ######################################
+			
+							  ################################### 	
+			movq %rcx, %rsi   # Making rsi hold address of a[l] #
+			addq %r10, %rsi   #                                 #
+							  ###################################
+			
+			movq (%rsi), %rax # Loading a[l] to rax 
+			
+			                  ###################################
+			movq %r12, %rsi   # Making rsi hold address of b[k] #
+			addq %r11, %rsi   #                                 #
+			                  ###################################
+							
+							  ##########################################
+			movq (%rsi), %rbx # Results in having a[l]*b[k] in rdx:rax #
+			mulq %rbx         #                                        #
+							  ##########################################
+			
+			movq (%rdi), %rbx # Loading c[l+k] to rbx
+			
+			
+			
+			
+			
+			# movq (%rdi), %rbx
+			# addq (%rsi), %rbx
+			
+			
+			
+			#end loop content
+			
+	
+	end_iter_mul_1: ret
