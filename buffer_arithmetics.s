@@ -1,6 +1,7 @@
 .text
 	.global add_buffers
 	.global sub_buffers
+	.global mul_buffers
 add_buffers:
 # rcx - addr of first input buffer
 # rdx - addr of second input buffer
@@ -96,17 +97,23 @@ sub_buffers:
 mul_buffers:
 # rcx - addr of first input buffer
 # rdx - addr of second input buffer
-# r8 - addr of output buffer
-# r9 - len of input buffers(B) = half length of output buffer
+# r8 - addr of 0-initialized output buffer (additional 64-bit 0x0 suffix required) 
+# r9 - len of input buffers(B) = half length of output buffer (w/o suffix)
 
 	movq %rdx, %r12 # saving rdx to r12, because rdx will be used by mulq
+	
+					#######################################
+	movq %r8, %r14  #                                     #
+	addq %r9, %r14  # Load output buffer tail-1 into r14  #
+	decq %r14       #                                     #
+					#######################################
 	movq %r9, %r10
 	iter_mul_1: andq %r10, %r10
 	jz end_iter_mul_1
 	subq $0x8, %r10
 		movq %r9, %r11
 		iter_mul_2: andq %r11, %r11
-		# jz ??? !!!!!!!!!!!!!!!!!!!!!!!!!
+		jz iter_mul_1 # !!!!!!!!!!!!!!!!!!!!!!!!!
 		subq $0x8, %r11
 			#begin loop content
 			movq %r8, %rdi    ######################################
@@ -130,16 +137,33 @@ mul_buffers:
 			mulq %rbx         #                                        #
 							  ##########################################
 			
-			movq (%rdi), %rbx # Loading c[l+k] to rbx
+			movq %rdi, %r13  # save rdi in r13 for after-propagation
 			
+			prop1: movq (%r13), %rbx # Loading c[l+k+propagation] to rbx
+			addq %rax, %rbx
+			lahf
+			movb %ah, %al
+			andq $0x1, %rax
+			movq %rbx, (%r13) # storing rbx to c[l+k+propagation]
+			jz end_prop1
+			addq $0x8, %r13
+			jmp prop1
 			
+			end_prop1: movq %rdi, %r13 #restore initial r13 from rdi
+			incq %r13
 			
+			prop2: movq (%r13), %rbx # Loading c[l+k+propagation] to rbx
+			addq %rdx, %rbx
+			lahf
+			movb %ah, %al
+			andq $0x1, %rax
+			movq %rax, %rdx
+			movq %rbx, (%r13) # storing rbx to c[l+k+propagation]
+			jz end_prop2
+			addq $0x8, %r13
+			jmp prop2
 			
-			
-			# movq (%rdi), %rbx
-			# addq (%rsi), %rbx
-			
-			
+			end_prop2: jmp iter_mul_2
 			
 			#end loop content
 			

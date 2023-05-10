@@ -7,4 +7,6 @@ extern "C" void add_buffers(ull* input_buffer_1, ull* input_buffer_2, ull* outpu
 
 extern "C" void sub_buffers(ull* input_buffer_1, ull* input_buffer_2, ull* output_buffer, ull length);
 
+extern "C" void mul_buffers(ull* input_buffer_1, ull* input_buffer_2, ull* output_buffer, ull input_n_bytes);
+
 #endif // BUFFER_ARITHMETICS_H_INCLUDED

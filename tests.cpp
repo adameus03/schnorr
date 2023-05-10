@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cstring>
 #include "buffer_arithmetics.h"
 
 typedef unsigned char uchar;
@@ -49,6 +50,30 @@ uchar test_sub_buffers(){
     else if(0x5 != *(output+0x1)) retval = 0x0;
     else if(0x5 != *(output+0x2)) retval = 0x0;
     else if(0xef6d != *(output+0x3)) retval = 0x0;
+
+    return retval;
+}
+
+uchar test_mul_buffers(){
+    ull* input_1 = new ull[0x4];
+    ull* input_2 = new ull[0x4];
+    *input_1 = 0x5;
+    *(input_1+0x1) = 0x0;
+    *(input_1+0x2) = 0x0;
+    *(input_1+0x3) = 0x0;
+
+    *input_2 = 0x0;
+    *(input_2+0x1) = 0x1;
+    *(input_2+0x2) = 0x0;
+    *(input_2+0x3) = 0x0;
+    ull* output = new ull[0x9];
+    memset(output, 0, 0x9<<0x3);
+    mul_buffers(input_1, input_2, output, 0x20);
+    uchar retval = 0x1;
+    if(0x0 != *output) retval = 0x0;
+    else if(0x5 != *(output+0x1)) retval = 0x0;
+    else if(0x0 != *(output+0x2)) retval = 0x0;
+    else if(0x0 != *(output+0x3)) retval = 0x0;
 
     return retval;
 }

@@ -12,4 +12,6 @@ uchar test_add_buffers();
 
 uchar test_sub_buffers();
 
+uchar test_mul_buffers();
+
 #endif // TESTS_H_INCLUDED

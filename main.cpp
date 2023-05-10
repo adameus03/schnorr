@@ -11,5 +11,7 @@ int main()
 
     checker(test_sub_buffers(), "sub_buffers");
 
+    checker(test_mul_buffers(), "mul_buffers");
+
     return 0;
 }
