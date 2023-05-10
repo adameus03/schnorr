@@ -13,5 +13,7 @@ int main()
 
     checker(test_mul_buffers(), "mul_buffers");
 
+    checker(test_smod_buffer(), "smod_buffer");
+
     return 0;
 }
