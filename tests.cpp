@@ -78,24 +78,46 @@ uchar test_mul_buffers(){
     return retval;
 }
 
-uchar test_smod_buffer(){
-    ull* iobuf = new ull[0x4];
+uchar test_mod_buffer(){
+    /*ull* iobuf = new ull[0x4];
     ull* modbuf = new ull[0x4];
-    *iobuf       = 0b1011010110110101101101011011010110110101101101011011010110110101;
-    *(iobuf+0x1) = 0b1011010110110101101101011011010110110101101101011011010110110101;
-    *(iobuf+0x2) = 0b1011010110110101101101011011010110110101101101011011010110110101;
-    *(iobuf+0x3) = 0b1011010110110101101101011011010110110101101101011011010110110101;
+    *iobuf       = 0xd;
+    *(iobuf+0x1) = 0x0;
+    *(iobuf+0x2) = 0x0;
+    *(iobuf+0x3) = 0x0;
 
-    *modbuf      = 0b0000000000000000000000000000110100010101101001101000110000100110;
+    *modbuf      = 0x7;
     *(modbuf+0x1)= 0b0000000000000000000000000000000000000000000000000000000000000000;
     *(modbuf+0x2)= 0b0000000000000000000000000000000000000000000000000000000000000000;
     *(modbuf+0x3)= 0b0000000000000000000000000000000000000000000000000000000000000000;
     smod_buffer(iobuf, modbuf, 0x20);
     uchar retval = 0x1;
-    if(            0b0000000000000000000000000000010110110101101101011011010110110101 !=       *iobuf) retval = 0x0;
+    if(            0x6 !=       *iobuf) retval = 0x0;
     else if(       0b0000000000000000000000000000000000000000000000000000000000000000 != *(iobuf+0x1)) retval = 0x0;
     else if(       0b0000000000000000000000000000000000000000000000000000000000000000 != *(iobuf+0x2)) retval = 0x0;
     else if(       0b0000000000000000000000000000000000000000000000000000000000000000 != *(iobuf+0x3)) retval = 0x0;
+
+    return retval;*/
+
+    ull* input_1 = new ull[0x4];
+    ull* input_2 = new ull[0x4];
+    *input_1 = 0xd;
+    *(input_1+0x1) = 0x0;
+    *(input_1+0x2) = 0x0;
+    *(input_1+0x3) = 0x0;
+
+    *input_2 = 0x7;
+    *(input_2+0x1) = 0x0;
+    *(input_2+0x2) = 0x0;
+    *(input_2+0x3) = 0x0;
+    ull* output = new ull[0x9];
+    memset(output, 0, 0x9<<0x3);
+    mod_buffer(input_1, input_2, output, 0x20);
+    uchar retval = 0x1;
+    if(0x6 != *output) retval = 0x0;
+    else if(0x0 != *(output+0x1)) retval = 0x0;
+    else if(0x0 != *(output+0x2)) retval = 0x0;
+    else if(0x0 != *(output+0x3)) retval = 0x0;
 
     return retval;
 }

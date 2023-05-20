@@ -9,6 +9,8 @@ extern "C" void sub_buffers(ull* input_buffer_1, ull* input_buffer_2, ull* outpu
 
 extern "C" void mul_buffers(ull* input_buffer_1, ull* input_buffer_2, ull* output_buffer, ull input_n_bytes);
 
-extern "C" void smod_buffer(ull* io_buffer, ull* mod_buffer, ull length);
+// extern "C" void smod_buffer(ull* io_buffer, ull* mod_buffer, ull length);
+
+extern "C" void mod_buffer(ull* input_buffer_1, ull* input_buffer_2, ull* output_buffer, ull length);
 
 #endif // BUFFER_ARITHMETICS_H_INCLUDED
