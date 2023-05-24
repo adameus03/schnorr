@@ -101,20 +101,25 @@ uchar test_mod_buffer(){
 
     ull* input_1 = new ull[0x4];
     ull* input_2 = new ull[0x4];
-    *input_1 = 0xd;
-    *(input_1+0x1) = 0x0;
-    *(input_1+0x2) = 0x0;
-    *(input_1+0x3) = 0x0;
+    *input_1 = /*0xd;*/0xdd1;
+    *(input_1+0x1) = /*0x0;*/0xb245525465768967;
+    *(input_1+0x2) = /*0x0;*/0x114356ff5eab44c5;
+    *(input_1+0x3) = /*0x0; */0x0245ccea31d3f8a3;
 
-    *input_2 = 0x7;
+    *input_2 = /*0x7;*/0x2;
     *(input_2+0x1) = 0x0;
     *(input_2+0x2) = 0x0;
     *(input_2+0x3) = 0x0;
-    ull* output = new ull[0x9];
-    memset(output, 0, 0x9<<0x3);
-    mod_buffer(input_1, input_2, output, 0x20);
+
+    // 00001101
+    // 00000111
+
+
+    ull* output = new ull[0xd];
+    memset(output, 0, 0xd<<0x3);
+    mod_buffer(input_1, input_2, output, /*0x20*/0x4);
     uchar retval = 0x1;
-    if(0x6 != *output) retval = 0x0;
+    if(/*0x6*/0x1 != *output) retval = 0x0;
     else if(0x0 != *(output+0x1)) retval = 0x0;
     else if(0x0 != *(output+0x2)) retval = 0x0;
     else if(0x0 != *(output+0x3)) retval = 0x0;

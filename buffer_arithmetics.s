@@ -171,247 +171,265 @@ mul_buffers:
 
 	end_iter_mul_1: ret
 
-smod_buffer_old:
-# rcx - addr of first input buffer = output buffer
-# rdx - addr of buffer to divide by (second buffer) - non zero! a.k.a. modbuf
-#       //OBSOLETE: 64bit 0x0 additional suffix mandatory
-# OBSOLETE: r8 - addr of output buffer
-# r8 - len of each buffer(B) //OBSOLETE: (w/0 suffix)
-
-	movq %rdx, %rsi   ##############################################
-	addq %r8, %rsi    # Load tail of second buffer (modbuf) to rsi #
-	# addq $0x8, %rsi ##############################################
-
-	movq %rcx, %rdi   ######################################
-	addq %r8, %rdi    # Load tail of io buffer to rdi      #
-	# addq $0x8, %rdi ######################################
-
-	movq %rdi, %r12  # Copy rdi to r12, to access output tail later
-	subq $0x8, %r12  # Make it the tail-1 of output
-
-	zero_run_old: subq $0x8, %rsi
-	subq $0x8, %rdi
-	movq (%rsi), %rbx # Load buffer blk to rbx
-	andq %rbx, %rbx
-	jz zero_run_old
-
-	movq $0xffffffffffffffff, %r11 # run mask
-	movq $0x8000000000000000, %r10 #####################################
-	zero_walk_old: movq %r10, %rax #                                   #
-	andq %rbx, %rax                #  Inside-blk walk to non-zero bit  #
-	jnz end_zero_walk_old          #                                   #
-	shrq $0x1, %r10                #                                   #
-	shrq $0x1, %r11                #                                   #
-	jmp zero_walk_old              #####################################
-
-	end_zero_walk_old: andq %r11, (%rdi) # zero mid-blk using r11 mask
-
-	zero_big_old: cmpq %rdi, %r12  ###################### output tail-1 comparison #
-	jz end_zero_big_old             #                  #
-	addq $0x8, %rdi                 #  Zero high blks  #
-	movq $0x0, (%rdi)               #                  #
-	jmp zero_big_old              ########################
-
-	end_zero_big_old: movq %r8, %r9  # preparing for sub call
-	shrq $0x3, %r9               # converting bytes to blks
-	movq %rcx, %r8
+mod_buffer:
+# rcx - addr of dividend input buffer
+# rdx - addr of divisor input buffer - non zero!
+#	Most significant blk of divisor buffer should be 64-bit 0x0 
+# r8 - addr of remainder output buffer - (r9+2*r9+1) 64-bit BLKS 0-initialized!!
+# r9 - len of input buffers(64-bit blks)
 	
-	substract_old: pushq %rcx 
-	pushq %rdx 
-	pushq %r8 
-	pushq %r9 
-	call sub_buffers
-	popq %r9 
-	popq %r8
-	popq %rdx 
-	popq %rcx
-	andb %al, %al
-	jz substract_old
+	movq %rcx, %r10 #dividend buffer head
+	movq %rdx, %r11 #divisor buffer head
+	movq %r8, %r12  #output buffer head
+	movq %r9, %r13  #length counter
 	
-	# Now it is neccessary to comeback from the overshot by using addition
-	call add_buffers
-	ret
-
-smod_buffer:
-# rcx - addr of first input buffer
-# rdx - addr of buffer to divide by (second buffer) - non zero! a.k.a. modbuf
-#	Most significant blk of modbuf should be 64-bit 0x0 
-# r8 - addr of output buffer - MS blk suffix required + requirements for mul_buffers!!
-# r9 - len of input buffers(B) //OBSOLETE: (w/0 suffix)
-	movq %rdx, %rsi   ##############################################
-	addq %r9, %rsi    # Load tail of second buffer (modbuf) to rsi #
-	# addq $0x8, %rsi ##############################################
-
-					   ###################################
-	movq %rcx, %r13   # Load tail of input buffer to r13  #
-	addq %r9, %r13     ###################################
-
-
-	movq %r8, %rdi   ######################################
-	addq %r9, %rdi    # Load tail of output buffer to rdi #
-	# addq $0x8, %rdi ######################################
-	
-	
-	movq %rdi, %r12  # Copy rdi to r12, to access output tail later	
-	movq %r13, %r14  # Copy r13 to r14
+	# Find MS non-zero blk of divisor buffer
+	movq %r9, %rdi
+	shlq $0x3, %rdi  #length in bytes
+	addq %rdi, %r11
+	msnb_find: subq $0x8, %r11
+		cmpq $0x0, (%r11)
+		jz msnb_find
 		
-	cpy: cmpq %r14, %rcx
-	jz end_cpy
-	subq $0x8, %r14
+	#[BIG ENDIAN BLOCKWISE]
+	#abcdefghi   dividend 
+	#^       
+	#zzzzznzzz   divisor
+	#xxxxxxxxx   output
+    #    ^   
+	
+	movq %r11, %rax
+	subq %rdx, %rax   #hold index*8 of divisor msnb 
+	
+	addq %rdi, %r10
+	addq %rdi, %r12
+	
+	subq %rax, %r12
+	# subq $0x8, %r12
+	
+	blk_as: cmpq %r12, %r8
+	jz end_blk_as
+		subq $0x8, %r10
+		subq $0x8, %r12
+		movq (%r10), %rbx
+		movq %rbx, (%r12)
+		jmp blk_as
+	end_blk_as: nop
+	
+	#[BIG ENDIAN BITWISE]
+	#abcdefgh ijklmnop	dividend adjacent blks
+	#         00000101  divisor msnb (critical blk)
+	#abcdefgh ijklmnop  output adjacent blks  >>
+	
+	# 000ijklm
+	# fgh00000
+	
+	movq %rcx, %r10 # save rcx in r10 / needed?
+	movq %rdx, %r11 # save rdx in r11 / needed?
+	movb $0x7, %cl
+	# r11 still contains address of divisor critical blk
+	movq (%r11), %rsi
+	scan_critical: 
+		movq $0x1, %rbx
+		shlq %cl, %rbx
+		andq %rsi, %rbx
+		jnz end_scan_critical
+		decb %cl
+		jmp scan_critical
+	end_scan_critical: nop
+	incb %cl # critical offset
+	
+	# if critical offset == 64 then shift 1 blk more
+	# else perform critical shift
+	# (or maybe unify it?) YES
+	
+	# r12 is at r8
+	
+	critical_shift: jz end_critical_shift
+		movq (%r12), %rbx
+		shrq %cl, %rbx
+		
+		movq %r12, %rsi
+		addq $0x8, %rsi
+		movq (%rsi), %rax
+		
+		movb $0x8, %ch
+		subb %cl, %ch
+		xchgb %ch, %cl
+		shlq %cl, %rax
+		movb %ch, %cl
+		
+		orq %rax, %rbx
+		movq %rbx, (%r12)
+		
+		addq $0x8, %r12
+		decq %r13
+		jmp critical_shift #
+	end_critical_shift: nop
+	
+	#restore rcx, rdx
+	movq %r10, %rcx #r10
+	movq %r11, %rdx #r11 
+	
+	#check final condition
+	#check if buffer at r8 is zeroed
+	movq %r8, %r12
+	movq %r9, %rdi
+	shlq $0x3, %rdi
+	addq %rdi, %r12
+	zeroed_check: cmpq %r12, %r8
+	jz end_zeroed_check
 	subq $0x8, %r12
-	movq (%r14), %rbx
-	movq %rbx, (%r12) 
-	jmp cpy
-	end_cpy: nop
-		
-		
-	
-	movq %rdi, %r12  # Copy rdi to r12, to access output tail later
-	subq $0x8, %r12  # Make it the tail-1 of output
-
-	zero_run: subq $0x8, %rsi
-	subq $0x8, %rdi
-	subq $0x8, %r13
-	movq (%rsi), %rbx # Load buffer blk to rbx
+	movq (%r12), %rbx
 	andq %rbx, %rbx
-	jz zero_run
-
-	movq $0xffffffffffffffff, %r11 # run mask
-	movq $0x8000000000000000, %r10 #####################################
-	zero_walk: movq %r10, %rax     #                                   #
-	andq %rbx, %rax                #  Inside-blk walk to non-zero bit  #
-	jnz end_zero_walk              #                                   #
-	shrq $0x1, %r10                #                                   #
-	shrq $0x1, %r11                #                                   #
-	jmp zero_walk                  #####################################
-
-	end_zero_walk: andq %r11, (%rdi) # zero mid-blk using r11 mask
-
-	zero_big: cmpq %rdi, %r12  ###################### output tail-1 comparison #
-	jz end_zero_big             #                  #
-	addq $0x8, %rdi             #  Zero high blks  #
-	movq $0x0, (%rdi)           #                  #
-	jmp zero_big              ########################
-
-
-	end_zero_big: nop
+	jz zeroed_check
 	
+	jmp proceed
+	end_zeroed_check: nop #movq %rcx, %r8
+	
+	#if a<b return a, else return a-b
+	call buffer_gte
+	andb %al, %al
+	jnz fin_modsub
+	
+	# copy rcx to r8
+	movq %rcx, %r10
+	movq %r8, %r12
+	addq %rdi, %r10
+	addq %rdi, %r12
+	fin_copy: cmpq %r10, %rcx
+	jz end_fin_copy
+		subq $0x8, %r10
+		subq $0x8, %r12
+		movq (%r10), %rbx
+		movq %rbx, (%r12)
+		jmp fin_copy
+	end_fin_copy: nop
+	#zero lower r8?
+	ret
+	
+	fin_modsub: call sub_buffers
+	
+	ret
+	
+	
+	proceed: movq %r8, %r12  #prepare for zeroing upper r8 buffer
+	movq %r9, %r13
+	shlq $0x1, %r13
+	addq %r9, %r13
+	incq %r13
+	movq %r13, %rdi
+	shlq $0x3, %rdi
+	addq %rdi, %r12
+	subq %r9, %r13    #keep the lower r8 buffer
+	
+	zero_lay: andq %r13, %r13
+	jz end_zero_lay
+		decq %r13
+		subq $0x8, %r12
+		movq $0x0, (%r12)
+		jmp zero_lay
+	end_zero_lay: nop
+		
 	movq %rcx, %r15 # preparing for calls
-	pushq %rdx
-	movq %r8, %rcx
+	pushq %rdx      ####
+	
+	
+	movq %r8, %rcx # factor1
+	addq %r9, %r8  # product
+	
+	
+	
 	pushq %rdi
+	shlq $0x3, %r9
 	call mul_buffers
+	shrq $0x3, %r9
 	popq %rdi
 	movq %r8, %rdx
 	movq %r15, %rcx
+	subq %r9, %r8
 	pushq %r8
 	pushq %r9
-	shrq $0x3, %r9
+	#shrq $0x3, %r9
 	call sub_buffers
 	popq %r9
 	popq %r8
 	popq %rdx
 	
-	#check if buffer at r8 is zeroed
-
-	movq %rdi, %rax
-	zeroed_check: cmpq %rax, %r8
-	jz end_zeroed_check
-	subq $0x8, %rax
-	movq (%rax), %rbx
-	andq %rbx, %rbx
-	jz zeroed_check
-	##################################
-	#need to repeat zero-pad division#
-	##################################
-	movq %r8, %rcx
-	jmp smod_buffer
 	
-	end_zeroed_check: movq %r8, %rcx
-	shrq $0x3, %r9
-	call sub_buffers
+	###################################
+	#need to repeat the shift division#
+	###################################
+	# Copy r8 to rcx
+	movq %r15, %rcx #restore rcx   #bug between 364 and 181
+	movq %rcx, %r10
+	movq %r8, %r12
+	movq %r9, %rdi
+	shlq $0x3, %rdi
+	addq %rdi, %r10
+	addq %rdi, %r12
+	prep_copy: cmpq %r10, %rcx
+	jz end_prep_copy
+		subq $0x8, %r10
+		subq $0x8, %r12
+		movq (%r12), %rbx
+		movq %rbx, (%r10)
+		jmp prep_copy
+	end_prep_copy: nop
+	
+	#zero r8
+	movq %r8, %r12 #or check if here? (replace br. 364 with 379)
+	movq %r9, %r13
+	shlq $0x1, %r13
+	addq %r9, %r13
+	incq %r13
+	movq %r13, %rdi
+	shlq $0x3, %rdi
+	addq %rdi, %r12
+	zero_prep: andq %r13, %r13
+	jz end_zero_prep
+		decq %r13
+		subq $0x8, %r12
+		movq $0x0, (%r12)
+		jmp zero_prep
+	end_zero_prep: nop
+	
+	jmp mod_buffer
+	
+	
+	
+	# zero output suffix after multiplication! Here or in multiplication
+	# or maybe not really?
+	
+buffer_gte:
+#rcx - first input buffer
+#rdx - second input buffer
+#r9  - buffer length (blks)
+#al  - 0x1 if first>=second else 0x0
+	movq %rcx, %r10
+	movq %rdx, %r12
+	movq %r9, %rdi
+	shlq $0x3, %rdi
+	addq %rdi, %r10
+	addq %rdi, %r12
+	comparing: cmpq %r10, %rcx
+	jz end_comparing
+		subq $0x8, %r10
+		subq $0x8, %r12
+		cmpq $0x0, (%r10)
+		jnz end_comparing
+		cmpq $0x0, (%r12)
+		jnz end_comparing
+		jmp comparing
+	end_comparing: nop
+	movq (%r10), %rax
+	movq (%r12), %rbx
+	cmpq %rbx, %rax #
+	jge result_ge
+	xorb %al, %al
 	ret
 	
-	
-
-
-
-	#movq %r8, %r9  # preparing for sub call
-	#shrq $0x3, %r9               # converting bytes to blks
-	#movq %rcx, %r8
-	
-	#substract: pushq %rcx 
-	#pushq %rdx 
-	#pushq %r8 
-	#pushq %r9 
-	#call sub_buffers
-	#popq %r9 
-	#popq %r8
-	#popq %rdx 
-	#popq %rcx
-	#andb %al, %al
-	#jz substract
-	
-	# Now it is neccessary to comeback from the overshot by using addition
-	#call add_buffers
-	#ret
-	
-mod_buffer:
-# rcx - addr of first input buffer
-# rdx - addr of buffer to divide by (second buffer) - non zero! a.k.a. modbuf
-#	Most significant blk of modbuf should be 64-bit 0x0 
-# r8 - addr of output buffer - MS blk suffix required + requirements for mul_buffers!!
-# r9 - len of input buffers(64-bit blks)
-	movq %rcx, %r10
-	movq %rdx, %r11   #changed
-	movq %r8, %r12
-	movq %r9, %r13
-	
-	non_zero_scan: movq (%r11), %rbx
-	andq %rbx, %rbx
-	jnz end_non_zero_scan
-	incq %r11
-	jmp non_zero_scan
-	end_non_zero_scan: nop
-	                #### 
-	movq %r11, %rax # Makes rax contain non-zero blk index 
-	subq %rdx, %rax #
-                    ####
-					
-	addq %r9, %r10
-	addq %r9, %r12
-	
-	copy: cmpq %r10, %rcx
-	jz end_copy
-		decq %r10
-		decq %r12
-		movq (%r10), %rbx
-		movq %rbx, (%r12)
-	jmp copy
-	
-	end_copy: movq %r12, %rsi
-	addq %r9, %rsi
-	movq %rsi, %r12
-	subq %rax, %r12
-	
-	blk_shift: cmpq %r12, %r8
-	jz end_blk_shift
-		decq %rsi
-		decq %r12
-		movq(%rsi), %rbx
-		movq %rbx, (%r12)
-	jmp blk_shift
-	
-	end_blk_shift: movq $0x1, %rax
-	movq (%rdx), %r14
-	xorq %r15, %r15
-	
-	blk_scan: incq %r15
-		movq %r14, %rbx
-		andq %rax, %rbx
-		jnz end_blk_scan
-		shlq $0x1, %rax
-		jz blk_scan
-	
-	end_blk_scan: cmpq $0x8, %r15 # if r15 == 8 shift 1 blk, else precise
+	result_ge: xorb %al, %al
+	incb %al
+	ret
 	
