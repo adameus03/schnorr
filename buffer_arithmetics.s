@@ -3,6 +3,7 @@
 	.global sub_buffers
 	.global mul_buffers
 	.global mod_buffer
+	.global powermod_buffer
 add_buffers:
 # rcx - addr of first input buffer
 # rdx - addr of second input buffer
@@ -431,5 +432,198 @@ buffer_gte:
 	
 	result_ge: xorb %al, %al
 	incb %al
+	ret
+	
+powermod_buffer:
+#rcx - base input buffer (length: L)
+#rdx - exponent input buffer (length: L)
+#r8  - output buffer (length: 6*L+3) 0-initialized
+		#first 2*L as result of exponentiation 
+#r9  - input buffer length L (blks)
+	movq %rcx, %r10   #modified
+	movq %rdx, %r11
+	movq %r8, %r14
+	movq %r9, %rdi
+	shlq $0x1, %rdi
+	addq $0x1, %rdi
+	shlq $0x3, %rdi
+	addq %rdi, %r14 # r14 const from now (high out buff)
+	movq %r14, %r15 #modified
+	movq %r9, %r13
+	
+	movq $0x1, (%r14)
+	movq $0x1, (%r8)
+	
+	#copy base buffer to higher output buffer (r14)
+	movq %r9, %rdi
+	shlq $0x3, %rdi
+	addq %rdi, %r10
+	addq %rdi, %r15
+	init_cpy: cmpq %r10, %rcx
+	jz end_init_cpy
+		subq $0x8, %r10
+		subq $0x8, %r15
+		movq (%r10), %rbx
+		movq %rbx, (%r15)
+		jmp init_cpy
+	end_init_cpy: nop
+	
+	movq %r9, %rdi
+	shlq $0x1, %rdi
+	incq %rdi
+	shlq $0x3, %rdi
+	addq %r14, %rdi #rdi changed purpouse to buffer ptr
+	
+	#blk loop
+	exp_blk_iter: andq %r13, %r13
+	jz end_exp_blk_iter
+		decq %r13
+		movq $0x1, %rax
+		movq (%r11), %rsi
+		#bit scanner loop
+		b_scan: andq %rax, %rax
+		jz end_b_scan
+			#check if bit is set - if yes, then multiply
+			movq %rax, %rbx
+			andq %rsi, %rbx
+			jz cont_b_scan
+			
+			#zero rdi buffer
+			movq %r9, %rbx
+			shlq $0x1, %rbx
+			incq %rbx
+			shlq $0x3, %rbx
+			addq %rdi, %rbx
+			prod_buf_zero: cmpq %rbx, %rdi
+			jz end_prod_buf_zero
+				subq $0x8, %rbx
+				movq $0x0, (%rbx)
+				jmp prod_buf_zero
+			end_prod_buf_zero: nop
+			
+			#multiply r8 by r14 
+			pushq %rcx # verif if neccessary
+			pushq %rdx # verif if neccessary
+			pushq %rdi
+			pushq %rax
+			pushq %rsi
+			pushq %r8
+			pushq %r14
+			pushq %r10
+			pushq %r11
+			pushq %r12
+			pushq %r13
+			movq %r8, %rcx
+			movq %r14, %rdx
+			movq %rdi, %r8
+			shlq $0x3, %r9
+			call mul_buffers
+			shrq $0x3, %r9
+			popq %r13
+			popq %r12
+			popq %r11
+			popq %r10
+			popq %r14
+			popq %r8
+			popq %rsi
+			popq %rax
+			popq %rdi
+			popq %rdx # verif if neccessary
+			popq %rcx # verif if neccessary
+			
+			#copy rdi to r8
+			movq %r9, %rbx
+			shlq $0x1, %rbx
+			incq %rbx
+			shlq $0x3, %rbx
+			movq %r8, %r12
+			addq %rbx, %r12
+			addq %rdi, %rbx
+			
+			pushq %rax
+			result_copier: cmpq %r12, %r8
+			jz end_result_copier
+				subq $0x8, %rbx
+				subq $0x8, %r12
+				movq (%rbx), %rax
+				movq %rax, (%r12)
+				jmp result_copier
+			end_result_copier: nop
+			popq %rax
+			
+			
+			cont_b_scan: shlq $0x1, %rax
+			# square r14
+			pushq %rcx
+			pushq %rdx
+			pushq %rdi
+			pushq %rax
+			pushq %rsi
+			pushq %r8
+			pushq %r14
+			pushq %r10
+			pushq %r11
+			pushq %r12
+			pushq %r13
+			movq %r14, %rcx
+			movq %r14, %rdx # will it work?
+			movq %rdi, %r8
+			
+			#zero rdi buffer for square
+			movq %r9, %rbx
+			shlq $0x1, %rbx
+			incq %rbx
+			shlq $0x3, %rbx
+			addq %rdi, %rbx
+			square_buf_zero: cmpq %rbx, %rdi
+			jz end_square_buf_zero
+				subq $0x8, %rbx
+				movq $0x0, (%rbx)
+				jmp square_buf_zero
+			end_square_buf_zero: nop
+			
+			
+			shlq $0x3, %r9
+			call mul_buffers
+			shrq $0x3, %r9
+			
+			popq %r13
+			popq %r12
+			popq %r11
+			popq %r10
+			popq %r14
+			popq %r8
+			popq %rsi
+			popq %rax
+			popq %rdi
+			popq %rdx
+			popq %rcx
+			
+			#copy rdi to r14
+			movq %r9, %rbx
+			shlq $0x1, %rbx
+			incq %rbx
+			shlq $0x3, %rbx
+			movq %r14, %r15
+			addq %rbx, %r15
+			addq %rdi, %rbx
+			
+			pushq %rax
+			square_copier: cmpq %r15, %r14
+			jz end_square_copier
+				subq $0x8, %rbx
+				subq $0x8, %r15
+				movq (%rbx), %rax
+				movq %rax, (%r15)
+				jmp square_copier
+			end_square_copier: nop
+			popq %rax
+			
+			jmp b_scan
+		end_b_scan: nop
+		
+		addq $0x8, %r11
+		jmp exp_blk_iter
+	end_exp_blk_iter: nop
 	ret
 	

@@ -16,4 +16,6 @@ uchar test_mul_buffers();
 
 uchar test_mod_buffer();
 
+uchar test_powermod_buffer();
+
 #endif // TESTS_H_INCLUDED

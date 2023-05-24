@@ -13,4 +13,6 @@ extern "C" void mul_buffers(ull* input_buffer_1, ull* input_buffer_2, ull* outpu
 
 extern "C" void mod_buffer(ull* input_buffer_1, ull* input_buffer_2, ull* output_buffer, ull length);
 
+extern "C" void powermod_buffer(ull* input_buffer_1, ull* input_buffer_2, ull* output_buffer, ull length);
+
 #endif // BUFFER_ARITHMETICS_H_INCLUDED
