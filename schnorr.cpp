@@ -179,6 +179,23 @@ void generate_av(ull* p, ull* h, ull* a, ull* v, const uint& blks_cnt){
     memcpy(v, pow_buf, blks_cnt<<0x3);
 }
 
-void schnorr_sign(ull* p, ull* q, ull* h, ull* a){
+void schnorr_sign(ull* p, ull* q, ull* h, ull* a, const uint& blks_cnt){
+    ull* _r = new ull[blks_cnt];
 
+    ull* _r_head = _r + blks_cnt;
+    while(_r_head != _r){
+        _r_head--;
+        *_r_head = (((ull)rand()) << 0x20) | (ull)rand();
+    }
+
+    ull* r = new ull[blks_cnt*0x3+0x1];
+    memset(r, 0, (blks_cnt*0x3+0x1)<<0x3);
+    mod_buffer(_r, q, r, blks_cnt);
+    ull* _x = new ull[blks_cnt*0x6+0x3];
+    memset(_x, 0, (blks_cnt*0x6+0x3)<<0x3);
+    powermod_buffer(h, r, _x, blks_cnt);
+    ull* x = new ull[blks_cnt*0x3+0x1];
+    memset(x, 0, (blks_cnt*0x3+0x1)<<0x3);
+    mod_buffer(_x, p, x, blks_cnt);
+    // X generated
 }
