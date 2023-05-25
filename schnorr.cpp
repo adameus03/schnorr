@@ -198,4 +198,5 @@ void schnorr_sign(ull* p, ull* q, ull* h, ull* a, const uint& blks_cnt){
     memset(x, 0, (blks_cnt*0x3+0x1)<<0x3);
     mod_buffer(_x, p, x, blks_cnt);
     // X generated
+
 }
