@@ -4,6 +4,7 @@
 #include <sstream>
 #include <iomanip>
 
+typedef unsigned long long ull;
 using namespace std;
 
 void zero_bits(unsigned char* byte_ptr, unsigned char left, unsigned char right) {
@@ -214,7 +215,7 @@ void compress(unsigned int* w, unsigned int* k, unsigned int& a, unsigned int& b
     cout << "h7 = " << bitset<32>(h7) << endl;
     cout << endl;
 }*/
-int sha256hash(unsigned char* data, unsigned char* hashed, unsigned long int length/*, bool verbose*/) {
+void sha256hash(unsigned char* data, ull* hashed, ull length/*, bool verbose*/) {
 
     /*
         todo:
@@ -285,9 +286,12 @@ int sha256hash(unsigned char* data, unsigned char* hashed, unsigned long int len
 
 
     //deallocate_chunks_memory(chunks, chunks_count);
-    memcpy(hashed, chunks, chunks_count<<0x6);
     delete[] chunks;
 
+    *hashed = ((ull)h0) | (ull)h1;
+    *(hashed+0x1) = ((ull)h2) | (ull)h3;
+    *(hashed+0x2) = ((ull)h4) | (ull)h5;
+    *(hashed+0x3) = ((ull)h6) | (ull)h7;
     /*cout << hex
         << setfill('0') << setw(8) << h0
         << setfill('0') << setw(8) << h1
@@ -304,5 +308,4 @@ int sha256hash(unsigned char* data, unsigned char* hashed, unsigned long int len
 
     //return "ok";
     //return (char*)ss.str().c_str();
-    return chunks_count;
 }

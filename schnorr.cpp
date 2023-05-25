@@ -1,6 +1,7 @@
 #include "buffer_arithmetics.h"
 #include <random>
 #include <cstring>
+#include "sha256.h"
 
 #define P_LENGTH 512
 #define Q_LENGTH 140
@@ -179,7 +180,9 @@ void generate_av(ull* p, ull* h, ull* a, ull* v, const uint& blks_cnt){
     memcpy(v, pow_buf, blks_cnt<<0x3);
 }
 
-void schnorr_sign(ull* p, ull* q, ull* h, ull* a, const uint& blks_cnt){
+// M - data buffer
+// s1 still blks_cnt
+void schnorr_sign(uchar* M, const ull& M_length, ull* p, ull* q, ull* h, ull* a, const uint& blks_cnt, ull* s1, ull* s2){
     ull* _r = new ull[blks_cnt];
 
     ull* _r_head = _r + blks_cnt;
@@ -199,4 +202,21 @@ void schnorr_sign(ull* p, ull* q, ull* h, ull* a, const uint& blks_cnt){
     mod_buffer(_x, p, x, blks_cnt);
     // X generated
 
+    ull MX_length = M_length + (blks_cnt<<0x3);
+    uchar* MX = new uchar[MX_length];
+    memcpy(MX, M, M_length);
+    memcpy(MX+M_length, x, blks_cnt<<0x3);
+    //MX ready
+    //ull* s1 = new ull[0x4];
+    sha256hash(MX, s1, MX_length);
+
+    ull* accumulator = new ull[(blks_cnt<<0x1)+0x1];
+    memset(accumulator, 0, ((blks_cnt<<0x1)+0x1)<<0x3);
+    mul_buffers(a, s1, accumulator, blks_cnt<<0x3);
+    add_buffers(accumulator, r, accumulator, blks_cnt);
+
+    ull* modbuf = new ull[blks_cnt*0x3+0x1];
+    memset(modbuf, 0, (blks_cnt*0x3+0x1)<<0x3);
+    mod_buffer(accumulator, q, modbuf, blks_cnt);
+    memcpy(s2, modbuf, blks_cnt<<0x3);
 }
